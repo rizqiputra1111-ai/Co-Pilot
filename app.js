@@ -80,8 +80,9 @@ Analisa gambar chart realtime berikut:
 3. Tentukan potensi Liquidity Sweep (BSL/SSL).
 4. Berikan saran plan entry (BUY/SELL), area Stop Loss (SL ketat), dan Take Profit (TP).`;
 
-    // ENDPOINT FIXED: Menggunakan gemini-2.5-flash
-   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    // ENDPOINT REVISI: Menggunakan gemini-3.8-flash sesuai instruksi resmi Google
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
+
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
