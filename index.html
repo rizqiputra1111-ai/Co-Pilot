@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trading Co-Pilot AI (SMC)</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Lightweight Charts Library by TradingView -->
+  <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+</head>
+<body>
+  <div class="container">
+    <!-- Header Control Bar -->
+    <header>
+      <h2>XAUUSD / Crypto AI Co-Pilot</h2>
+      <div class="api-box">
+        <input type="password" id="apiKey" placeholder="Masukkan Gemini API Key..." />
+        <button id="btnAnalyze" onclick="analyzeChart()">🤖 Analisa Chart</button>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main>
+      <!-- Panel Chart Real-time -->
+      <div id="chartContainer"></div>
+
+      <!-- Panel Output Analisis Gemini -->
+      <div id="analysisPanel">
+        <h3>Hasil Analisis Gemini (SMC)</h3>
+        <div id="output">Siap dianalisis. Masukkan API Key lalu klik "Analisa Chart"...</div>
+      </div>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
