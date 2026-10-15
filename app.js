@@ -1,6 +1,6 @@
 const chartElement = document.getElementById('chartContainer');
 
-// Set ukuran eksplisit berdasarkan kontainer agar chart langsung muncul (tidak blank)
+// Dapatkan ukuran kontainer agar chart ter-render dengan tinggi & lebar yang pasti
 function getChartDimensions() {
   return {
     width: chartElement.clientWidth || 800,
@@ -24,7 +24,7 @@ const candleSeries = chart.addCandlestickSeries({
   wickUpColor: '#089981', wickDownColor: '#f23645'
 });
 
-// Resizing otomatis saat layar di-resize
+// Penyesuaian ukuran otomatis saat jendela browser di-resize
 window.addEventListener('resize', () => {
   const newDim = getChartDimensions();
   chart.applyOptions({ width: newDim.width, height: newDim.height });
@@ -45,24 +45,6 @@ ws.onmessage = (event) => {
   });
 };
 
-// Fungsi panggil Gemini API dengan fitur Retry
-async function fetchGeminiWithRetry(url, payload, maxRetries = 2) {
-  for (let i = 0; i <= maxRetries; i++) {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-
-    if (response.status === 503 && i < maxRetries) {
-      console.warn(`Server busy (503). Retrying in 3s... (Attempt ${i + 1}/${maxRetries})`);
-      await new Promise(res => setTimeout(res, 3000));
-      continue;
-    }
-    return response;
-  }
-}
-
 async function analyzeChart() {
   const apiKey = document.getElementById('apiKey').value.trim();
   const outputDiv = document.getElementById('output');
@@ -75,7 +57,7 @@ async function analyzeChart() {
 
   btn.disabled = true;
   btn.innerText = "⏳ Analyzing...";
-  outputDiv.innerText = "⏳ Memproses gambar chart dan menghubungkan ke Gemini AI...";
+  outputDiv.innerText = "⏳ Sedang memproses gambar chart dan mengirim ke Gemini AI...";
 
   try {
     const canvas = chartElement.querySelector('canvas');
@@ -93,19 +75,22 @@ Analisa gambar chart realtime berikut:
 3. Tentukan potensi Liquidity Sweep (BSL/SSL).
 4. Berikan saran plan entry (BUY/SELL), area Stop Loss (SL ketat), dan Take Profit (TP).`;
 
-    // Gunakan alias model publik paling stabil
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    // ENDPOINT RESMI TERBARU: gemini-3.8-flash
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
 
-    const payload = {
-      contents: [{
-        parts: [
-          { text: promptText },
-          { inline_data: { mime_type: "image/png", data: base64Data } }
-        ]
-      }]
-    };
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { text: promptText },
+            { inline_data: { mime_type: "image/png", data: base64Data } }
+          ]
+        }]
+      })
+    });
 
-    const response = await fetchGeminiWithRetry(url, payload);
     const result = await response.json();
 
     if (response.ok && result.candidates && result.candidates[0]) {
@@ -121,6 +106,6 @@ Analisa gambar chart realtime berikut:
     setTimeout(() => {
       btn.disabled = false;
       btn.innerText = "🤖 Analisa Chart";
-    }, 2000);
+    }, 3000);
   }
 }
