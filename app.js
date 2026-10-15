@@ -1,50 +1,3 @@
-// 1. Inisialisasi Chart Real-time (TradingView Lightweight Charts)
-const chartElement = document.getElementById('chartContainer');
-
-const chart = LightweightCharts.createChart(chartElement, {
-  layout: { 
-    backgroundColor: '#131722', 
-    textColor: '#d1d4dc' 
-  },
-  grid: { 
-    vertLines: { color: '#2b2f3a' }, 
-    horzLines: { color: '#2b2f3a' } 
-  },
-  timeScale: { 
-    timeVisible: true, 
-    secondsVisible: false 
-  },
-  autoSize: true
-});
-
-const candleSeries = chart.addCandlestickSeries({
-  upColor: '#089981', 
-  downColor: '#f23645',
-  borderUpColor: '#089981', 
-  borderDownColor: '#f23645',
-  wickUpColor: '#089981', 
-  wickDownColor: '#f23645'
-});
-
-// Stream Data Realtime via WebSocket (BTCUSDT Binance 15M)
-const ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@kline_15m');
-
-ws.onmessage = (event) => {
-  const data = JSON.parse(event.data);
-  const kline = data.k;
-  candleSeries.update({
-    time: Math.floor(kline.t / 1000),
-    open: parseFloat(kline.o),
-    high: parseFloat(kline.h),
-    low: parseFloat(kline.l),
-    close: parseFloat(kline.c)
-  });
-};
-
-ws.onerror = (err) => {
-  console.error("WebSocket Error:", err);
-};
-
 // 2. Fungsi Ambil Screenshot Canvas & Kirim ke Gemini API
 async function analyzeChart() {
   const apiKeyInput = document.getElementById('apiKey');
@@ -80,8 +33,8 @@ Analisa gambar chart realtime berikut:
 3. Tentukan potensi Liquidity Sweep (BSL/SSL).
 4. Berikan saran plan entry (BUY/SELL), area Stop Loss (SL ketat), dan Take Profit (TP).`;
 
-    // Endpoint API Gemini 1.5 Flash
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    // ENDPOINT REVISI: Menggunakan gemini-2.5-flash atau gemini-1.5-flash-latest
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
     const response = await fetch(url, {
       method: 'POST',
