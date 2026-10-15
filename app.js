@@ -1,18 +1,9 @@
 const chartElement = document.getElementById('chartContainer');
 
-// Dapatkan ukuran kontainer agar chart ter-render dengan tinggi & lebar yang pasti
-function getChartDimensions() {
-  return {
-    width: chartElement.clientWidth || 800,
-    height: chartElement.clientHeight || 500
-  };
-}
-
-const dim = getChartDimensions();
-
+// 1. Buat Chart dengan ukuran eksplisit
 const chart = LightweightCharts.createChart(chartElement, {
-  width: dim.width,
-  height: dim.height,
+  width: chartElement.clientWidth || 800,
+  height: chartElement.clientHeight || 500,
   layout: { backgroundColor: '#131722', textColor: '#d1d4dc' },
   grid: { vertLines: { color: '#2b2f3a' }, horzLines: { color: '#2b2f3a' } },
   timeScale: { timeVisible: true, secondsVisible: false }
@@ -24,27 +15,60 @@ const candleSeries = chart.addCandlestickSeries({
   wickUpColor: '#089981', wickDownColor: '#f23645'
 });
 
-// Penyesuaian ukuran otomatis saat jendela browser di-resize
+// Resizing otomatis saat layar di-resize
 window.addEventListener('resize', () => {
-  const newDim = getChartDimensions();
-  chart.applyOptions({ width: newDim.width, height: newDim.height });
+  chart.applyOptions({
+    width: chartElement.clientWidth,
+    height: chartElement.clientHeight
+  });
 });
 
-// Stream Data Realtime via WebSocket (BTCUSDT Binance 15M)
-const ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@kline_15m');
+// 2. AMBIL DATA HISTORIS (HISTORICAL CANDLES) AGAR CHART TIDAK BLANK
+async function loadHistoricalData() {
+  try {
+    const response = await fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=15m&limit=100');
+    const data = await response.json();
+    
+    const formattedData = data.map(d => ({
+      time: Math.floor(d[0] / 1000),
+      open: parseFloat(d[1]),
+      high: parseFloat(d[2]),
+      low: parseFloat(d[3]),
+      close: parseFloat(d[4])
+    }));
 
-ws.onmessage = (event) => {
-  const data = JSON.parse(event.data);
-  const kline = data.k;
-  candleSeries.update({
-    time: Math.floor(kline.t / 1000),
-    open: parseFloat(kline.o),
-    high: parseFloat(kline.h),
-    low: parseFloat(kline.l),
-    close: parseFloat(kline.c)
-  });
-};
+    // Masukkan data historis ke chart
+    candleSeries.setData(formattedData);
+    chart.timeScale().fitContent();
 
+    // Baru jalankan WebSocket Realtime setelah data historis dimuat
+    connectWebSocket();
+  } catch (error) {
+    console.error("Gagal memuat data historis Binance:", error);
+  }
+}
+
+// 3. Stream Data Realtime via WebSocket
+function connectWebSocket() {
+  const ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@kline_15m');
+
+  ws.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    const kline = data.k;
+    candleSeries.update({
+      time: Math.floor(kline.t / 1000),
+      open: parseFloat(kline.o),
+      high: parseFloat(kline.h),
+      low: parseFloat(kline.l),
+      close: parseFloat(kline.c)
+    });
+  };
+}
+
+// Jalankan pemuatan data saat halaman dibuka
+loadHistoricalData();
+
+// 4. Fungsi Analisis Chart via Gemini API
 async function analyzeChart() {
   const apiKey = document.getElementById('apiKey').value.trim();
   const outputDiv = document.getElementById('output');
@@ -57,7 +81,7 @@ async function analyzeChart() {
 
   btn.disabled = true;
   btn.innerText = "⏳ Analyzing...";
-  outputDiv.innerText = "⏳ Sedang memproses gambar chart dan mengirim ke Gemini AI...";
+  outputDiv.innerText = "⏳ Sedang memproses screenshot chart dan mengirim ke Gemini AI...";
 
   try {
     const canvas = chartElement.querySelector('canvas');
@@ -75,8 +99,8 @@ Analisa gambar chart realtime berikut:
 3. Tentukan potensi Liquidity Sweep (BSL/SSL).
 4. Berikan saran plan entry (BUY/SELL), area Stop Loss (SL ketat), dan Take Profit (TP).`;
 
-    // ENDPOINT RESMI TERBARU: gemini-3.8-flash
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
+    // Gunakan endpoint resmi publik: gemini-1.5-flash
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
     const response = await fetch(url, {
       method: 'POST',
