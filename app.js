@@ -1,29 +1,33 @@
-// 1. Inisialisasi Chart Real-time (TradingView Lightweight Charts)
 const chartElement = document.getElementById('chartContainer');
 
+// Set ukuran eksplisit berdasarkan kontainer agar chart langsung muncul (tidak blank)
+function getChartDimensions() {
+  return {
+    width: chartElement.clientWidth || 800,
+    height: chartElement.clientHeight || 500
+  };
+}
+
+const dim = getChartDimensions();
+
 const chart = LightweightCharts.createChart(chartElement, {
-  layout: { 
-    backgroundColor: '#131722', 
-    textColor: '#d1d4dc' 
-  },
-  grid: { 
-    vertLines: { color: '#2b2f3a' }, 
-    horzLines: { color: '#2b2f3a' } 
-  },
-  timeScale: { 
-    timeVisible: true, 
-    secondsVisible: false 
-  },
-  autoSize: true
+  width: dim.width,
+  height: dim.height,
+  layout: { backgroundColor: '#131722', textColor: '#d1d4dc' },
+  grid: { vertLines: { color: '#2b2f3a' }, horzLines: { color: '#2b2f3a' } },
+  timeScale: { timeVisible: true, secondsVisible: false }
 });
 
 const candleSeries = chart.addCandlestickSeries({
-  upColor: '#089981', 
-  downColor: '#f23645',
-  borderUpColor: '#089981', 
-  borderDownColor: '#f23645',
-  wickUpColor: '#089981', 
-  wickDownColor: '#f23645'
+  upColor: '#089981', downColor: '#f23645',
+  borderUpColor: '#089981', borderDownColor: '#f23645',
+  wickUpColor: '#089981', wickDownColor: '#f23645'
+});
+
+// Resizing otomatis saat layar di-resize
+window.addEventListener('resize', () => {
+  const newDim = getChartDimensions();
+  chart.applyOptions({ width: newDim.width, height: newDim.height });
 });
 
 // Stream Data Realtime via WebSocket (BTCUSDT Binance 15M)
@@ -41,14 +45,26 @@ ws.onmessage = (event) => {
   });
 };
 
-ws.onerror = (err) => {
-  console.error("WebSocket Error:", err);
-};
+// Fungsi panggil Gemini API dengan fitur Retry
+async function fetchGeminiWithRetry(url, payload, maxRetries = 2) {
+  for (let i = 0; i <= maxRetries; i++) {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
 
-// 2. Fungsi Ambil Screenshot Canvas & Kirim ke Gemini API
+    if (response.status === 503 && i < maxRetries) {
+      console.warn(`Server busy (503). Retrying in 3s... (Attempt ${i + 1}/${maxRetries})`);
+      await new Promise(res => setTimeout(res, 3000));
+      continue;
+    }
+    return response;
+  }
+}
+
 async function analyzeChart() {
-  const apiKeyInput = document.getElementById('apiKey');
-  const apiKey = apiKeyInput.value.trim();
+  const apiKey = document.getElementById('apiKey').value.trim();
   const outputDiv = document.getElementById('output');
   const btn = document.getElementById('btnAnalyze');
 
@@ -57,10 +73,9 @@ async function analyzeChart() {
     return;
   }
 
-  // Set status loading & matikan tombol sementara
   btn.disabled = true;
   btn.innerText = "⏳ Analyzing...";
-  outputDiv.innerText = "⏳ Sedang mengambil screenshot chart dan dikirim ke Gemini AI...";
+  outputDiv.innerText = "⏳ Memproses gambar chart dan menghubungkan ke Gemini AI...";
 
   try {
     const canvas = chartElement.querySelector('canvas');
@@ -68,11 +83,9 @@ async function analyzeChart() {
       throw new Error("Canvas chart belum siap/ditemukan.");
     }
 
-    // Ambil string Base64 murni dari canvas
     const dataUrl = canvas.toDataURL('image/png');
     const base64Data = dataUrl.replace(/^data:image\/(png|jpg);base64,/, "");
 
-    // Prompt khusus Smart Money Concepts
     const promptText = `Kamu adalah analis trading profesional berspesialisasi dalam Smart Money Concepts (SMC) dan Liquidity.
 Analisa gambar chart realtime berikut:
 1. Identifikasi struktur tren saat ini (M15).
@@ -80,45 +93,34 @@ Analisa gambar chart realtime berikut:
 3. Tentukan potensi Liquidity Sweep (BSL/SSL).
 4. Berikan saran plan entry (BUY/SELL), area Stop Loss (SL ketat), dan Take Profit (TP).`;
 
-    // ENDPOINT REVISI: Menggunakan gemini-3.8-flash sesuai instruksi resmi Google
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
+    // Gunakan alias model publik paling stabil
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: promptText },
-            {
-              inline_data: {
-                mime_type: "image/png",
-                data: base64Data
-              }
-            }
-          ]
-        }]
-      })
-    });
+    const payload = {
+      contents: [{
+        parts: [
+          { text: promptText },
+          { inline_data: { mime_type: "image/png", data: base64Data } }
+        ]
+      }]
+    };
 
+    const response = await fetchGeminiWithRetry(url, payload);
     const result = await response.json();
 
     if (response.ok && result.candidates && result.candidates[0]) {
       outputDiv.innerText = result.candidates[0].content.parts[0].text;
     } else {
-      console.error("API Error Response:", result);
       const errMsg = result.error ? result.error.message : "Gagal memproses respon.";
       outputDiv.innerText = `❌ Error API (${response.status}):\n${errMsg}`;
     }
 
   } catch (error) {
-    console.error("Error Detail:", error);
     outputDiv.innerText = `❌ Terjadi kesalahan:\n${error.message}`;
   } finally {
-    // Aktifkan kembali tombol setelah 3 detik
     setTimeout(() => {
       btn.disabled = false;
       btn.innerText = "🤖 Analisa Chart";
-    }, 3000);
+    }, 2000);
   }
 }
